@@ -21,10 +21,10 @@ $ node server.js
 
 ## To Start MongoDB
 From your command prompt say  <br />
-mongod <br />
+**mongod** <br />
 ## After this step <br />
 Open another command prompt <br />
 Just say <br />
-mongo
+**mongo**
 
 ## Now, You have setup the project successfully.
