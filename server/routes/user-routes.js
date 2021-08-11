@@ -1,17 +1,18 @@
 const express = require("express");
 const router = express.Router();
 const Users = require("../models/user");
+const Token =require("../models/token");
 const bcrypt = require("bcrypt");
+const confirmEmail=require("../controllers/index")
+const crypto = require('crypto');
+const nodemailer = require('nodemailer');
+const sendgridTransport = require('nodemailer-sendgrid-transport');
 const jwt = require("jsonwebtoken");
 const keys = require("../config/keys");
 const fetch=require("node-fetch")
 const {OAuth2Client}=require("google-auth-library");
 const client= new OAuth2Client(keys.google.clientID)
-const confirmEmail=require("../controllers/index")
-const crypto = require('crypto');
-const nodemailer = require('nodemailer');
-const sendgridTransport = require('nodemailer-sendgrid-transport');
-const Token =require("../models/token");
+
 
 router.post(
     "/signup",
@@ -49,41 +50,37 @@ router.post(
             user.save(function (err) {
               if (err) { 
                 return res.status(500).send({msg:err.message});
-              }
+              }else{res.status(200).json({
+                message: "registered"
+              });
+            }
               
               // generate token and save
-              var token = new Token({ _userId: user._id, token: crypto.randomBytes(16).toString('hex') });
-              token.save(function (err) {
-                if(err){
-                  return res.status(500).send({msg:err.message});
-                }
+              // var token = new Token({ _userId: user._id, token: crypto.randomBytes(16).toString('hex') });
+              // token.save(function (err) {
+              //   if(err){
+              //     return res.status(500).send({msg:err.message});
+              //   }
   
-                  // Send email (use verified sender's email address & generated API_KEY on SendGrid)
-                  // const transporter = nodemailer.createTransport(
-                  //   sendgridTransport({
-                  //       auth:{
-                  //           api_key:SENDGRID_APIKEY,
-                  //       }
-                  //   })
-                  // )
+              //     // Send email (use verified sender's email address & generated API_KEY on SendGrid)
 
-                  // send email from your gmail account
-                  const smtpTransport = nodemailer.createTransport({
-                    service: "Gmail",
-                    auth: {
-                        user: "write your email",
-                        pass: "your password"
-                    }
-                });
-                  var mailOptions = { from: 'mailtosonam123@gmail.com', to: user.email, subject: 'Account Verification Link', text: 'Hello '+ user.fullName +',\n\n' + 'Please verify your account by clicking the link: \nhttp:\/\/' + req.headers.host + '\/api/v1/confirmation\/' + user.email + '\/' + token.token + '\n\nThank You!\n' };
-                  smtpTransport.sendMail(mailOptions, function (err) {
-                      if (err) { 
-                          return res.status(500).send({msg:'Technical Issue!, Please click on resend for verify your Email.'});
-                       }
-                      return res.status(200).send('A verification email has been sent to ' + user.email + '. It will be expire after one day. If you not get verification Email click on resend token.');
-                  });
-              });
-            });
+              //     const smtpTransport = nodemailer.createTransport({
+              //       service: "Gmail",
+              //       auth: {
+              //           user: "your email",
+              //           pass: "password"
+              //       }
+              //   });
+              //     var mailOptions = { from: 'your email', to: user.email, subject: 'Account Verification Link', text: 'Hello '+ user.fullName +',\n\n' + 'Please verify your account by clicking the link: \nhttp:\/\/' + req.headers.host + '\/api/v1/confirmation\/' + user.email + '\/' + token.token + '\n\nThank You!\n' };
+              //     smtpTransport.sendMail(mailOptions, function (err) {
+              //         if (err) { 
+              //           console.log(err)
+              //             return res.status(500).send({msg:'Technical Issue!, Please click on resend for verify your Email.'});
+              //          }
+              //         return res.status(200).send('A verification email has been sent to ' + user.email + '. It will be expire after one day. If you not get verification Email click on resend token.');
+              //     });
+              // });
+            }); 
         } catch (err) {
             console.log(err.message);
             res.status(500).send("Error in Saving");
@@ -93,14 +90,13 @@ router.post(
 
 router.get('/confirmation/:email/:token',confirmEmail)
 
-
 router.post(
     "/login",
     async (req, res,next) => {
       const { username, password } = req.body;
       try {
         let user = await Users.findOne({
-          email:username
+          fullName:username
         });
         if (!user)
           return res.status(400).json({
@@ -111,13 +107,16 @@ router.post(
           return res.status(400).json({
             message: "Incorrect Password !"
           });
+        if (!user.isVerified){
+            return res.status(401).send({msg:'Your Email has not been verified. Please click on resend'});
+        } 
           const token = jwt.sign({ user }, keys.token.TOKEN_SECRET);
             req.token = token;
             const newUser = {
                 token: req.token,
                 user: req.user,
               };
-              res.send(newUser);
+              res.status(200).send(newUser);
       } catch (e) {
         console.error(e);
         res.status(500).json({
@@ -188,7 +187,6 @@ router.post(
     }).then( (res)=>{
       return res.json()
     })
-    console.log("data",data)
     const {name,email}=data
         let user= await Users.findOne({email})
         if(user){
@@ -214,6 +212,7 @@ router.post(
           })
         }
     })
+
     router.post("/linkedinlogin", 
     async(req,res)=>{
       const{code}=req.body
@@ -291,6 +290,5 @@ router.post(
               })
             }
         })
-  
     
 module.exports = router;
